@@ -1,0 +1,30 @@
+--@name GM AIDS
+--@author Periapsis
+--@shared
+
+--@include libs/async.txt
+--@include libs/ultisetup.txt
+
+--@include client/colors.txt
+--@include client/console.txt
+
+GMAIDS = {}
+
+require( "libs/async.txt" )
+
+if SERVER then
+end
+
+if CLIENT then
+    local UltiSetup = require( "libs/ultisetup.txt" )
+
+    local function main()
+        UltiSetup.setupPermissionsAsync( { "http.get" }, "These permissions are required for GM AIDS to work properly." )
+        UltiSetup.setupGithubDownload( "periapsis", "gmaids", "main", "gmaids" )
+
+        require( "client/colors.txt" )
+        require( "client/console.txt" )
+    end
+
+    async( main )()
+end

@@ -1,0 +1,259 @@
+--@name Async Library
+--@author Periapsis
+--@shared
+
+local coroutine_yield = coroutine.yield
+
+---@class AsyncFunction
+---@field private func function
+---@field private thread table
+---@field private exec thread
+---@field private name string
+---@field private values table
+---@field private call function
+---@field __call fun(...): Thread
+local callable = {}
+function callable:__call( ... )
+    return self:call( ... )
+end
+
+---@class Thread<T>
+---@field private func AsyncFunction
+---@field private exec thread
+---@field private name string
+---@field private values table?
+
+--- Create a new async function.
+---@param func function # The function to run asynchronously.
+---@return AsyncFunction # The async function.
+---@diagnostic disable-next-line: lowercase-global
+function async( func )
+    local asyncFunction = {}
+
+    asyncFunction.func = func
+
+    function asyncFunction:call( ... )
+        local routine = coroutine.create( self.func )
+        local args = {...}
+
+        ---@type Thread
+        local thread = {
+            func = self,
+            exec = routine,
+            name = "Thread_" .. tostring( routine )
+        }
+
+        local values
+
+        ---@diagnostic disable-next-line: invisible
+        hook.add( "Tick", thread.name, function()
+            if coroutine.status( routine ) ~= "dead" then
+                values = { coroutine.resume( routine, unpack( args ) ) }
+                return
+            end
+
+            ---@diagnostic disable-next-line: invisible
+            thread.values = values
+
+            ---@diagnostic disable-next-line: invisible
+            hook.remove( "Tick", thread.name )
+        end )
+
+        return thread
+    end
+
+    return setmetatable( asyncFunction, callable )
+end
+
+--- Wait for a thread to finish.
+---@generic T
+---@param thread Thread<T> # The thread to wait for.
+---@return T # The values returned by the thread.
+---@diagnostic disable-next-line: lowercase-global
+function await( thread )
+    ---@diagnostic disable-next-line: invisible
+    while not thread.values do
+        coroutine_yield()
+    end
+
+    ---@diagnostic disable-next-line: invisible
+    return unpack( thread.values )
+end
+
+--- Sleep for a given amount of time.
+---@param time number # The amount of time to sleep in milliseconds.
+---@diagnostic disable-next-line: lowercase-global
+function sleep( time )
+    coroutine.wait( time * 0.001 )
+end
+
+--- Halts the execution of the current coroutine.
+---@diagnostic disable-next-line: lowercase-global
+function yield()
+    coroutine_yield()
+end
+
+-- Utilities
+
+---@class HTTPResponse
+---@field content string
+---@field length number
+---@field headers table
+---@field code number
+
+local function http_getAsync( url, headers )
+    local waiting = true
+    local response
+
+    local function onSuccess( body, length, headers, code )
+        response = {
+            content = body,
+            length = length,
+            headers = headers,
+            code = code
+        }
+
+        waiting = false
+    end
+
+    local function onFail( reason )
+        response = {
+            content = reason,
+            length = reason:len(),
+            headers = {},
+            code = 400
+        }
+
+        waiting = false
+    end
+
+    http.get( url, onSuccess, onFail, headers )
+    while waiting do yield() end
+
+    return response
+end
+
+--- Get a URL asynchronously.
+---@param url string # The URL to get.
+---@param headers table? # The headers to send with the request.
+---@return Thread<HTTPResponse> # The response from the URL.
+function http.getAsync( url, headers )
+    return async( http_getAsync )( url, headers )
+end
+
+local function http_postAsync( url, payload, headers )
+    local waiting = true
+    local response
+
+    local function onSuccess( body, length, headers, code )
+        response = {
+            content = body,
+            length = length,
+            headers = headers,
+            code = code
+        }
+
+        waiting = false
+    end
+
+    local function onFail( reason )
+        response = {
+            content = reason,
+            length = reason:len(),
+            headers = {},
+            code = 400
+        }
+
+        waiting = false
+    end
+
+    http.post( url, payload, onSuccess, onFail, headers )
+    while waiting do yield() end
+
+    return response
+end
+
+--- Post a URL asynchronously.
+---@param url string # The URL to post to.
+---@param payload string # The payload to send with the request.
+---@param headers table? # The headers to send with the request.
+---@return HTTPResponse # The response from the URL.
+function http.postAsync( url, payload, headers )
+    return async( http_postAsync )( url, payload, headers )
+end
+
+local function hook_async( hookName )
+    local waiting = true
+    local values
+
+    local hookIdentifier = "AsyncHook_" .. tostring( {} )
+
+    local function callback( ... )
+        waiting = false
+        values = {...}
+
+        hook.remove( hookName, hookIdentifier )
+    end
+
+    hook.add( hookName, hookIdentifier, callback )
+    while waiting do yield() end
+
+    return unpack( values )
+end
+
+--- Get a hook asynchronously.
+---@param hookName string # The name of the hook to get.
+---@return any # The values returned by the hook.
+function hook.async( hookName )
+    return async( hook_async )( hookName )
+end
+
+if SERVER then
+    local function propCreateAsync( position, angles, model, frozen )
+        while not prop.canSpawn() do yield() end
+        return prop.create( position, angles, model, frozen )
+    end
+
+    --- Create a prop asynchronously.
+    ---@param position Vector # The position of the prop.
+    ---@param angles Angle # The angles of the prop.
+    ---@param model string # The model of the prop.
+    ---@param frozen boolean # Whether the prop is frozen.
+    ---@return Thread<Entity> # The prop that was created.
+    function prop.createAsync( position, angles, model, frozen )
+        return async( propCreateAsync )( position, angles, model, frozen )
+    end
+
+    local function propCreateSeatAsync( position, angles, model, frozen )
+        while not prop.canSpawn() do yield() end
+        return prop.createSeat( position, angles, model, frozen )
+    end
+
+    --- Create a seat asynchronously.
+    ---@param position Vector # The position of the seat.
+    ---@param angles Angle # The angles of the seat.
+    ---@param model string # The model of the seat.
+    ---@param frozen boolean # Whether the seat is frozen.
+    ---@return Thread<Entity> # The seat that was created.  
+    ---@diagnostic disable-next-line: lowercase-global
+    function prop.createSeatAsync( position, angles, model, frozen )
+        return async( propCreateSeatAsync )( position, angles, model, frozen )
+    end
+
+    local function propCreateComponentAsync( position, angles, class, model, frozen )
+        while not prop.canSpawn() do yield() end
+        return prop.createComponent( position, angles, class, model, frozen )
+    end
+
+    --- Create a component asynchronously.
+    ---@param position Vector # The position of the component.
+    ---@param angles Angle # The angles of the component.
+    ---@param class string # The class of the component.
+    ---@param model string # The model of the component.
+    ---@param frozen boolean # Whether the component is frozen.
+    ---@return Thread<Entity> # The component that was created.
+    ---@diagnostic disable-next-line: lowercase-global
+    function prop.createComponentAsync( position, angles, class, model, frozen )
+        return async( propCreateComponentAsync )( position, angles, class, model, frozen )
+    end
+end

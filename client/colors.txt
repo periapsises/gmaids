@@ -1,0 +1,18 @@
+--@client
+
+GMAIDS.Colors = {
+    White = Color( 255, 255, 255 ),
+    Black = Color( 0, 0, 0 ),
+    Light = {
+        Background = Color( 77, 128, 97 ),
+        BackgroundAccent = Color( 137, 162, 87 ),
+        Foreground = Color( 190, 220, 127 ),
+        ForegroundAccent = Color( 238, 255, 204 ),
+    },
+    Dark = {
+        Background = Color( 4, 12, 6 ),
+        BackgroundAccent = Color( 17, 35, 24 ),
+        Foreground = Color( 30, 58, 41 ),
+        ForegroundAccent = Color( 48, 93, 66 ),
+    },
+}

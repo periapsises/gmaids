@@ -1,0 +1,4 @@
+--@client
+
+local Console = {}
+GMAIDS.Console = Console
