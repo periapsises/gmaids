@@ -20,7 +20,7 @@ if CLIENT then
 
     local function main()
         UltiSetup.setupPermissionsAsync( { "http.get" }, "These permissions are required for GM AIDS to work properly." )
-        UltiSetup.setupGithubDownload( "periapsis", "gmaids", "main", "gmaids" )
+        UltiSetup.setupGithubDownload( "periapsis", "gmaids", "content", "gmaids" )
 
         require( "client/colors.txt" )
         require( "client/console.txt" )
